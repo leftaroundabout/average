@@ -12,6 +12,7 @@ import Test.Hspec.Checkers
 import Test.QuickCheck
 import Test.QuickCheck.Checkers
 import Test.QuickCheck.Classes (applicative, functor, monoid)
+import Data.Function (on)
 
 
 instance Arbitrary (Average Rational) where
