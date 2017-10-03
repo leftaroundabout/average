@@ -1,7 +1,9 @@
 
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 ------------------------------------------------------------------------------------
 -- |
@@ -19,14 +21,15 @@
 
 module Data.Monoid.Average (
     Average(..),
-    average,
-    maybeAverage
+    getAverage,
+    mayAverage
   ) where
 
 import Prelude hiding ((**))
 
 import Data.Typeable
 import Data.Maybe
+import Data.Function (on)
 import Data.Semigroup
 import Data.AdditiveGroup
 import Data.VectorSpace
@@ -37,42 +40,36 @@ import Control.Applicative
 -- |
 -- A monoid for 'Average' values.
 --
--- This is actually just the free monoid with an extra function 'average' for
--- extracing the (arithmetic) mean. This function is used to implement 'Real',
--- so you can use 'Average' whenever a ('Monoid', 'Real') is required.
+-- Represented by a /weight/ (i.e., how many values have already been
+-- considered) and by their average.
 --
--- >>> toRational $ mconcat [1,2::Average Rational]
--- 3 % 2
--- >>> toRational $ mconcat [1,2::Sum Rational]
--- 3 % 1
--- >>> toRational $ mconcat [1,2::Product Rational]
--- 2 % 1
+-- >>> getAverage $ foldMap averageDatum [1,2,3]
+-- 2.0
 --
-newtype Average a = Average { getAverage :: [a] }
-  deriving (Show, Semigroup, Monoid, Typeable, Functor, Applicative)
+data Average a = Average { averageWeight :: !Int, runningAverage :: !a }
+  deriving (Show, Typeable, Functor)
 
+instance Applicative Average where
+  pure = Average 1
+  Average wf f <*> Average wx x = Average (wf*wx) (f x)
+
+instance (VectorSpace v, Fractional (Scalar v)) => Semigroup (Average v) where
+  Average 0 _ <> b = b
+  a <> Average 0 _ = a
+  Average wa a <> Average wb b
+      = Average wΣ $ (fromIntegral wa*^a ^+^ fromIntegral wb*^b)
+                        ^/ fromIntegral wΣ
+   where wΣ = wa + wb
+
+instance (VectorSpace v, Fractional (Scalar v)) => Monoid (Average v) where
+  mempty = Average 0 zeroV
+  mappend = (<>)
+    
 instance (Fractional a, Eq a) => Eq (Average a) where
-  a == b = average a == average b
+  a == b = getAverage a == getAverage b
 
 instance (Fractional a, Ord a) => Ord (Average a) where
-  a `compare` b = average a `compare` average b
-  
--- What should (+) and (*) do for Average values?
--- 
--- The important thing is to preserve scalar addition and multiplication (for example
--- scaling all components of) an average value by some constant factor, so we can just as
--- well use the standard list instance. What about averages with more components? I *think*
--- 'average' is a linear map, so they would work as expected:
--- 
--- >>> average (2<>2<>3)+average (3<>3)
--- 16 % 3
--- >>> average $ (2<>2<>3)+(3<>3)
--- 16 % 3
--- >>> average (mconcat [5,6,9])*average (mconcat[-1,0])
--- (-10) % 3
--- >>> average $ (mconcat [5,6,9])*(mconcat[-1,0])
--- (-10) % 3
--- 
+  a `compare` b = getAverage a `compare` getAverage b
 
 instance Num a => Num (Average a) where
   (+) = liftA2 (+)
@@ -87,7 +84,7 @@ instance (Fractional a, Num a) => Fractional (Average a) where
   fromRational = pure . fromRational
 
 instance (Real a, Fractional a) => Real (Average a) where
-  toRational = toRational . average
+  toRational = toRational . getAverage
 
 instance Floating a => Floating (Average a) where
   pi = pure pi
@@ -127,12 +124,10 @@ instance Arbitrary a => Arbitrary (Average a) where
 -}
 
 -- | Return the average of all monoidal components. If given 'mempty', return zero.
-average :: Fractional a => Average a -> a
-average = fromMaybe 0 . maybeAverage
+getAverage :: Average a -> a
+getAverage = runningAverage
 
 -- | Return the average of all monoidal components. If given 'mempty', return 'Nothing'.
-maybeAverage :: Fractional a => Average a -> Maybe a
-maybeAverage (Average []) = Nothing
-maybeAverage (Average xs) = Just $ sum xs / fromIntegral (length xs)
-
-
+mayAverage :: Average a -> Maybe a
+mayAverage (Average 0 _) = Nothing
+mayAverage (Average _ x) = Just x

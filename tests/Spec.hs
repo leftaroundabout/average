@@ -15,13 +15,13 @@ import Test.QuickCheck.Classes (applicative, functor, monoid)
 
 
 instance Arbitrary (Average Rational) where
-  arbitrary = Average <$> arbitrary
+  arbitrary = Average <$> (getPositive <$> arbitrary) <*> arbitrary
 
 instance Arbitrary (Average (Rational -> Rational)) where
-  arbitrary = Average <$> arbitrary
+  arbitrary = Average <$> (getPositive <$> arbitrary) <*> arbitrary
 
 instance EqProp (Average Rational) where
-  Average l =-= Average m = (l==m) =-= True
+  Average wx x =-= Average wy y = (wx==wy, x==y) =-= (True, True)
 
 main :: IO ()
 main =
