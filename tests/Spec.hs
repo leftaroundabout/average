@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Main (main) where
 
@@ -14,6 +14,7 @@ import Test.QuickCheck.Checkers
 import Test.QuickCheck.Classes (applicative, functor, monoid)
 import Data.Function (on)
 
+#define INFXONAVG(op,numT) (op :: Average (numT) -> Average (numT) -> Average (numT))
 
 instance Arbitrary (Average Rational) where
   arbitrary = Average <$> arbitrary
@@ -33,20 +34,20 @@ main =
       testBatch $ applicative (undefined :: Average (Rational, Rational, Rational))
       describe "laws for: Num" $ do
         describe "addition" $ do
-          it "associativity" . property $ isAssoc @(Average Rational) (+)
-          it "commutative" . property $ isCommut @(Average Rational) (+)
-          it "left identity" . property $ leftId @(Average Rational) (+) 0
-          it "right identity" . property $ rightId @(Average Rational) (+) 0
+          it "associativity" . property $ isAssoc (INFXONAVG((+),Rational))
+          it "commutative" . property $ isCommut (INFXONAVG((+),Rational))
+          it "left identity" . property $ leftId (INFXONAVG((+),Rational)) 0
+          it "right identity" . property $ rightId (INFXONAVG((+),Rational)) 0
         describe "multiplication" $ do
-          it "associativity" . property $ isAssoc @(Average Rational) (*)
-          it "commutative" . property $ isCommut @(Average Rational) (*)
-          it "left identity" . property $ leftId @(Average Rational) (*) 1
-          it "right identity" . property $ rightId @(Average Rational) (*) 1
+          it "associativity" . property $ isAssoc (INFXONAVG((*),Rational))
+          it "commutative" . property $ isCommut (INFXONAVG((*),Rational))
+          it "left identity" . property $ leftId (INFXONAVG((*),Rational)) 1
+          it "right identity" . property $ rightId (INFXONAVG((*),Rational)) 1
       describe "laws for: vector space" $ do
-        it "associativity" . property $ isAssoc @(Average Rational) (^+^)
-        it "commutative" . property $ isCommut @(Average Rational) (^+^)
-        it "left identity" . property $ leftId @(Average Rational) (^+^) zeroV
-        it "right identity" . property $ rightId @(Average Rational) (^+^) zeroV
+        it "associativity" . property $ isAssoc (INFXONAVG((^+^),Rational))
+        it "commutative" . property $ isCommut (INFXONAVG((^+^),Rational))
+        it "left identity" . property $ leftId (INFXONAVG((^+^),Rational)) zeroV
+        it "right identity" . property $ rightId (INFXONAVG((^+^),Rational)) zeroV
         describe "closure" $ do
           it "distributive: c u v" . property $ \(c, u, v :: Average Rational) ->
             c *^ (u ^+^ v) =-= (c *^ u) ^+^ (c *^ v)
